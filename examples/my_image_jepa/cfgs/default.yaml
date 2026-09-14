@@ -16,14 +16,14 @@ model:
   patch_size: 2     # For ViT only 
 
   # Projector 
-  use_projector: false 
+  use_projector: true 
   proj_hidden_dim: 1024
   proj_output_dim: 1024 
 
 loss:
   type: vicreg    # vicreg or bcs 
   # VICReg loss weights 
-  std_coeff: 1.0
+  var_coeff: 1.0
   cov_coeff: 100.0
   # BCS loss weight (only used if type=bcs)
   lmbd: 10.0 
@@ -58,6 +58,6 @@ sweep:
     model.use_projector: [true, false]
     model.proj_hidden_dim: [64, 128, 256, 512, 1024, 2048, 4096]
     model.proj_output_dim: [64, 128, 256, 512, 1024, 2048, 4096]
-    loss.std_coeff: [1.0, 10.0, 100.0]
+    loss.var_coeff: [1.0, 10.0, 100.0]
     loss.cov_coeff: [0.1, 1.0, 10.0, 100.0]
     meta.seed: [1, 1000, 10000]

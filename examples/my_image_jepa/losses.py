@@ -4,32 +4,31 @@ import torch.nn.functional as F
 
 
 
-class HingeStdLoss(torch.nn.Module): 
+class HingeVarLoss(torch.nn.Module):
     def __init__(
-            self,
-            std_margin: float = 1.0
+        self,
+        var_margin: float = 1.0
     ):
         """
-        Encourages each feature to maintain at least a minimum standard devication.
-        Features with std below the margin incur a penalty of (std_margin =std).
+        Encourages each feature to maintain at least a minimum variance of one. 
+        Features with var below the margin incur a penalty of (var_margin = var).
         Args:
-            std_margin (float,default=1.0):
-                Minimum desired standard deviation per feature.
+            var_margin (float, default=1.0)
+                Minimum desired variance per feature.
         """
         super().__init__()
-        self.std_margin = std_margin
+        self.var_margin = var_margin
 
     def forward(self, x : torch.Tensor):
         """
         Args:
             x: [N, D] where N is number of samples, D is feature dimension
         Returns:
-            std_loss: Scalar tensor loss on standard deviations
+            var_loss: Scalar tensor loss on Variance.
         """
-        x = x - x.mean(dim=0,keepdim=True)
-        std = torch.sqrt(x.var(dim=0) + 0.0001)
-        std_loss = torch.mean(F.relu(self.std_margin - std))
-        return std_loss
+        var = x.var(dim=0)
+        var_loss = torch.mean(F.relu(self.var_margin - var))
+        return var_loss 
 
 class CovarianceLoss(torch.nn.Module):
     def __init__(self):
@@ -61,13 +60,13 @@ class CovarianceLoss(torch.nn.Module):
         return cov_loss
 
 class VICRegLoss(nn.Module):
-    """VICReg loss combining invariance, variance (std), and covariance terms."""
+    """VICReg loss combining invariance, variance, and covariance terms."""
 
-    def __init__(self,std_coeff=1.0,cov_coeff=1.0):
+    def __init__(self,var_coeff=1.0,cov_coeff=1.0):
         super().__init__()
-        self.std_coeff = std_coeff
+        self.var_coeff = var_coeff
         self.cov_coeff = cov_coeff
-        self.std_loss_fn = HingeStdLoss(std_margin=1.0)
+        self.var_loss_fn = HingeVarLoss(var_margin=1.0)
         self.cov_loss_fn = CovarianceLoss()
 
     def forward(self, z1, z2):
@@ -85,12 +84,12 @@ class VICRegLoss(nn.Module):
         sim_loss = F.mse_loss(z1,z2)
 
         # Variance loss (applied to both views and summed)
-        var_loss = self.std_loss_fn(z1) + self.std_loss_fn(z2)
+        var_loss = self.var_loss_fn(z1) + self.var_loss_fn(z2)
 
         # Covariance loss (applied to both views and summed)
         cov_loss = self.cov_loss_fn(z1) + self.cov_loss_fn(z2)
 
-        total_loss = sim_loss + self.std_coeff * var_loss + self.cov_coeff * cov_loss
+        total_loss = sim_loss + self.var_coeff * var_loss + self.cov_coeff * cov_loss
 
         return {
             "loss": total_loss,
