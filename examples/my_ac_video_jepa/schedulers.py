@@ -10,7 +10,7 @@ class CosineWithWarmup:
     """
 
     def __init__(
-        self, optimizer, total_steps, warmup_ratio=0.1, min_lr=1e-5, last_epochs=-1
+        self, optimizer, total_steps, warmup_ratio=0.1, min_lr=1e-5, last_epoch=-1
     ):
         """
         Args:

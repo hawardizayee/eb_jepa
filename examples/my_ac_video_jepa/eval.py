@@ -1,5 +1,5 @@
 """
-Evaluation utilites for action-conditioned Video JEPA.
+Evaluation utilities for action-conditioned Video JEPA.
 """
 
 import os 
@@ -17,23 +17,24 @@ logger = get_logger(__name__)
 @torch.no_grad()
 def launch_plan_eval(
     jepa,
-    env_creator,
-    folder,
-    epoch, 
-    global_step,
+    env_creator,    # function object, passing it to the `main_eval` function.
+    folder,         # folder dir created by `get_unified_experiment_dir`
+    epoch,          # logging purpose. 
+    global_step,    # loggin & dir purposes. 
     suffix="",
     num_eval_episodes=10,
-    loader=None,
-    prober=None,
-    plan_cfg=None
+    loader=None,        # val_loader 
+    prober=None,        # xy_prober
+    plan_cfg=None       # #ends up with cfgs/planning_mppi.yaml
 ):
     """Evaluate the planning capabilities of the trained JEPA model."""
-    logger.info(f"planning eval: epoch={epoch} step={global_step}")
+    logger.info(f"Planning eval: epoch={epoch} step={global_step}")
     jepa.eval()
     folder = Path(folder)
-    eval_folder = folder / "plan_eval" / f"step-{global_step}-{suffix}"
+    eval_folder = folder / "plan_eval" / f"step-{global_step}{suffix}"
     os.makedirs(eval_folder, exist_ok=True)
 
+    # Dumping
     if plan_cfg is not None:
         plan_cfg_file = eval_folder / "plan_config.yaml"
         with open(plan_cfg_file,"w") as f:
@@ -41,15 +42,15 @@ def launch_plan_eval(
 
     eval_results = main_eval(
         plan_cfg = plan_cfg,
-        mode=jepa,
-        env_creator=env_creator,
+        model=jepa,
+        env_creator=env_creator,    # function object
         eval_folder=eval_folder,
         num_episodes=num_eval_episodes,
-        loader=loader,
-        prober=prober
+        loader=loader,      # val_loader 
+        prober=prober       # xy_prober
     )
     logger.info(
-        f"  success_rate={eval_results['success_rate']:.2f} | mean_dist={eval_results["mean_state_dist"]:.4f}"
+        f"   success_rate={eval_results['success_rate']:.2f} | mean_dist={eval_results['mean_state_dist']:.4f}"
     )
     jepa.train()
 
@@ -59,16 +60,16 @@ def launch_plan_eval(
 @torch.no_grad()
 def launch_unroll_eval(
     jepa, 
-    env_creator,
+    env_creator,    # function object, passing it to the `main_unroll_eval` function.
     folder,
     epoch,
     global_step,
     suffix="",
-    loader=None,
-    prober=None,
+    loader=None,    # val_loader
+    prober=None,    # xy_prober
     cfg=None
 ):
-    """Evalute the unrolling (prediction) capabilities of the trained JEPA model."""
+    """Evaluate the unrolling (prediction) capabilities of the trained JEPA model."""
     jepa.eval()
     logger.info(f"Unroll eval: epoch={epoch} step={global_step}")
     folder = Path(folder)
@@ -76,18 +77,18 @@ def launch_unroll_eval(
     os.makedirs(eval_folder, exist_ok=True)
     eval_results = main_unroll_eval(
         jepa,
-        env_creator,
+        env_creator,    # function object
         eval_folder,
-        loader=loader,
-        prober=prober,
-        cfg=cfg
+        loader=loader,  # val_loader
+        prober=prober,  # xy_prober
+        cfg=cfg         # cfgs/train.yaml
     )
     steps = [0, 1, 2, 3]
     mean_values = " | ".join(
-        [f"t{i}={eval_results[f"val_rollout/mean_mse/{i}"]:.2f}" for i in steps]
+        [f"t{i}={eval_results[f'val_rollout/mean_mse/{i}']:.2f}" for i in steps]
     )
     std_values = " | ".join(
-        [f"{i}: {eval_results[f"val_rollout/std_mse/{i}"]:.2f}" for i in steps]
+        [f"{i}: {eval_results[f'val_rollout/std_mse/{i}']:.2f}" for i in steps]
     )
     logger.info(f"Unroll eval - mean_mse: {mean_values} | std_mse: {std_values}")
     jepa.train()

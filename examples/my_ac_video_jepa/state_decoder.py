@@ -28,4 +28,4 @@ class MLPXYHead(nn.Module):
 
         pred = pred.view(bs, t, 2).permute(0, 2, 1)
 
-        return pred 
+        return pred # (B, 2 , T)

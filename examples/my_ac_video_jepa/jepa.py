@@ -13,12 +13,12 @@ class JEPAbase(nn.Module):
         """Initialize JEPAbase with encoder, action encoder, and predictor."""
         super().__init__()
         # Observation Encoder
-        self.encoder = encoder
+        self.encoder = encoder  # ImpalaEncoder
         # Action Encoder
-        self.action_encoder = aencoder
+        self.action_encoder = aencoder  # Identity()
         # Predictor
-        self.predictor = predictor
-        self.single_unroll = getattr(self.predictor, "is_rnn", False)
+        self.predictor = predictor  # RNNPredictor
+        self.single_unroll = getattr(self.predictor, "is_rnn", False)   # True 
 
     def save(self, file):
         torch.save(self.state_dict(), file)
@@ -119,18 +119,18 @@ class JEPA(JEPAbase):
             - losses: None if compute_loss=False, otherwise tuple of 5 elements:
               (total_loss, reg_loss, reg_loss_unweighted, reg_loss_dict, pred_loss)
         """
-        state = self.encoder(observations)
-        context_length = getattr(self.predictor, "context_length", 0)
+        state = self.encoder(observations)  # ImpalaEncoder(x) ---> (B=384, D=512, T=17, 1, 1)
+        context_length = getattr(self.predictor, "context_length", 0)   # 0 
 
         # Compute regularization loss if needed
-        if compute_loss:
-            rloss, rloss_unweight, rloss_dict = self.regularizer(state, actions)
+        if compute_loss:    # True 
+            rloss, rloss_unweight, rloss_dict = self.regularizer(state, actions) # VC_IDM_Regularizer
             ploss = 0.0
         else:
             rloss = rloss_unweight = rloss_dict = ploss = None
 
         # Encode actions
-        if actions is not None:
+        if actions is not None: 
             actions_encoded = self.action_encoder(actions)
         else:
             actions_encoded = None
@@ -140,7 +140,7 @@ class JEPA(JEPAbase):
 
         # Parallel mode: process all timesteps at once, refeed GT context
         if unroll_mode == "parallel":
-            predicted_states = state
+            predicted_states = state    
             for _ in range(nsteps):
                 # Predict all timesteps, discard last (no target for it)
                 predicted_states = self.predictor(predicted_states, actions_encoded)[
@@ -159,38 +159,44 @@ class JEPA(JEPAbase):
         # Autoregressive mode: step-by-step with sliding window
         # Note: RNN predictors (is_rnn=True) are a special case with ctxt_window_time=1
         elif unroll_mode == "autoregressive":
-            if actions is not None and nsteps > actions.size(2):
+            if actions is not None and nsteps > actions.size(2):    # must be less than T of action
                 raise ValueError(
                     f"nsteps ({nsteps}) larger than action sequence length ({actions.size(2)})"
                 )
-            # For RNN predictors, force ctxt_window_time=1
-            effective_ctxt_window = 1 if self.single_unroll else ctxt_window_time
+            # For RNN predictors, forces effective_ctxt_window = 1
+            effective_ctxt_window = 1 if self.single_unroll else ctxt_window_time   # 1
 
-            predicted_states = state[:, :, :effective_ctxt_window]
-            for i in range(nsteps):
+            predicted_states = state[:, :, :effective_ctxt_window]  # (B=384, D=512, T=1, 1, 1)
+            for i in range(nsteps): # for training this is set in main.py to 8,
                 # Take last ctxt_window_time states
-                context_states = predicted_states[:, :, -effective_ctxt_window:]
+                context_states = predicted_states[:, :, -effective_ctxt_window:] # (B=384, D=512, T=1, 1, 1)
                 # Take corresponding actions
                 if actions_encoded is not None:
                     context_actions = actions_encoded[
-                        :, :, max(0, i + 1 - effective_ctxt_window) : i + 1
+                        :, :, max(0, i + 1 - effective_ctxt_window) : i + 1 # (B=384, C = 2, T = 1)
                     ]
+
+                    # [0:1] , [1:2] , [2:3]....[nsteps - 1:nsteps]
+
                 else:
                     context_actions = None
                 # Predict and take only last timestep
-                pred_step = self.predictor(context_states, context_actions)[:, :, -1:]
+                pred_step = self.predictor(context_states, context_actions)[:, :, -1:]  # (B=384, D=512, T=1, H=1, W=1) ---> [:, :, -1:] is no ops. 
+                
                 # Append prediction to sequence
-                predicted_states = torch.cat([predicted_states, pred_step], dim=2)
+                predicted_states = torch.cat([predicted_states, pred_step], dim=2)  # (B=384, D=512, T=2, 1, 1)
+                
                 # Collect step if requested
-                if return_all_steps:
-                    all_steps.append(predicted_states.clone())
+                if return_all_steps:    # False 
+                    all_steps.append(predicted_states.clone())  # for autoregressive this is redundant.
                 if compute_loss:
                     ploss += (
-                        self.predcost(pred_step, state[:, :, i + 1 : i + 2]) / nsteps
+                        self.predcost(pred_step, state[:, :, i + 1 : i + 2]) / nsteps   # pred_state T and state T are always 1 
                     )
         else:
             raise ValueError(f"Unknown unroll_mode: {unroll_mode}")
 
+            
         # Compute total loss and return
         if compute_loss:
             loss = rloss + ploss
@@ -202,7 +208,7 @@ class JEPA(JEPAbase):
         if return_all_steps:
             return all_steps, losses
         else:
-            return predicted_states, losses
+            return predicted_states, losses     # predicted_states (B, f=512, nsteps+1=18, 1, 1)
 
 
 class JEPAProbe(nn.Module):
@@ -233,5 +239,5 @@ class JEPAProbe(nn.Module):
         """Forward pass for training the head (JEPA encoder gradients are detached)."""
         with torch.no_grad():
             state = self.jepa.encode(observations)
-        output = self.head(state.detach())
+        output = self.head(state.detach())      # detached state goes through head that has parameters and creates computation graph
         return self.hcost(output, targets)

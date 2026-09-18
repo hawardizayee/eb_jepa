@@ -44,7 +44,7 @@ class ResnetStack(nn.Module):
     
     def __init__(self, input_channels, num_features, num_blocks, max_pooling=True):
         super(ResnetStack, self).__init__()
-        self.nun_features = num_features
+        self.num_features = num_features
         self.num_blocks = num_blocks
         self.max_pooling = max_pooling
         self.initial_conv = nn.Conv2d(
@@ -57,10 +57,10 @@ class ResnetStack(nn.Module):
         if max_pooling:
             self.max_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         else:
-            self.max_pool = nn.Identity
+            self.max_pool = nn.Identity()
 
     def forward(self,x):
-        x = self.initial_conv
+        x = self.initial_conv(x)
         x = self.max_pool(x)
         for block in self.blocks:
             x = block(x)
@@ -78,7 +78,7 @@ class ImpalaEncoder(nn.Module):
         layer_norm=False,
         input_channels=2,
         final_ln=True,
-        mlp_outputdim=512,
+        mlp_output_dim=512,
         input_shape=(2,65,65)
     ):
         super(ImpalaEncoder, self).__init__()
@@ -88,16 +88,16 @@ class ImpalaEncoder(nn.Module):
         self.dropout_rate = dropout_rate
         self.layer_norm = layer_norm
         self.input_shape = input_shape
-        self.mlp_outputdim = mlp_outputdim
+        self.mlp_output_dim = mlp_output_dim
 
         input_channels = [input_channels] + list(stack_sizes)   # [2,16,32,32]
 
         self.stack_blocks = nn.ModuleList(
             [
                 ResnetStack(
-                    input_channels=input_channels[i],
-                    num_features=stack_sizes * width,
-                    num_blocks=num_blocks,
+                    input_channels=input_channels[i],   # [2, 16, 32, 32]
+                    num_features=stack_size * width,    # (16, 32, 32)
+                    num_blocks=num_blocks,              # 2 ; ResnetBlock 
                 )
                 for i, stack_size in enumerate(stack_sizes)
             ]
@@ -108,16 +108,16 @@ class ImpalaEncoder(nn.Module):
         # Compute MLP input dimension dynamically 
         with torch.no_grad():
             # Create a dummy input (assuming typical input size for this encoder)
-            dummy_input = torch.zeros(1, *self.input_shape) # (1, C, H, W)
+            dummy_input = torch.zeros(1, *self.input_shape) # (1, C=2, H=65, W=65)
             conv_out = dummy_input
             for stack_block in self.stack_blocks:
                 conv_out = stack_block(conv_out)    # b c w h 
-            flattened_dim = conv_out.view(conv_out.size(0), -1).shape[1] # c * w * h
+            flattened_dim = conv_out.view(conv_out.size(0), -1).shape[1] # c * w * h = 2592
 
-        self.mlp = nn.Linear(flattened_dim, self.mlp_outputdim)
+        self.mlp = nn.Linear(flattened_dim, self.mlp_output_dim)
 
-        if final_ln:
-            self.final_ln = nn.LayerNorm(self.mlp_outputdim)
+        if final_ln:   # True
+            self.final_ln = nn.LayerNorm(self.mlp_output_dim)
         else:
             self.final_ln = nn.Identity()
 
@@ -149,15 +149,15 @@ class ImpalaEncoder(nn.Module):
             for i, stack_block in enumerate(self.stack_blocks):
                 conv_out = stack_block(conv_out)
                 if self.dropout_rate is not None:
-                    conv_out = self.dropout(conv_out)
+                    conv_out = self.dropout(conv_out)                
 
             conv_out = F.relu(conv_out)
-            if self.layer_norm:
+            if self.layer_norm: # False 
                 conv_out = nn.LayerNorm(conv_out.size()[1:])(conv_out) # b c w h
             #flatten 
-            out = conv_out.view(conv_out.size(0), -1)
+            out = conv_out.view(conv_out.size(0), -1) # (B, c * w * h = 2592)
             out = self.mlp(out)
-            out = self.final_ln
+            out = self.final_ln(out)
 
             features.append(out)
 
@@ -175,23 +175,23 @@ class RNNPredictor(nn.Module):
         hidden_size: int = 512,
         action_dim: Optional[int] =2,
         num_layers: int = 1,
-        final_ln: Optional[torch.nn.Module] = None,
+        final_ln: Optional[torch.nn.Module] = None, 
     ):
         super(RNNPredictor, self).__init__()
 
         self.num_layers = num_layers
 
         self.rnn = torch.nn.GRU(
-            input_size=action_dim,
-            hidden_size=hidden_size,
-            num_layers=num_layers
+            input_size=action_dim,      # 2
+            hidden_size=hidden_size,    # 512
+            num_layers=num_layers       # 1 
         )
 
         self.final_ln = final_ln
         self.is_rnn = True
         self.context_length = 0 
 
-    def forward(self, state, action):
+    def forward(self, state, action): # context_states, context_actions
         """
         Propagate one step forward.
 
@@ -205,7 +205,7 @@ class RNNPredictor(nn.Module):
         rnn_state = state.flatten(1, 4).unsqueeze(0).contiguous() # [1, B, D]
         rnn_input = action.squeeze(-1).unsqueeze(0).contiguous() # [1, B, A]
 
-        next_state, _ = self.rnn(rnn_input, rnn_state)
+        next_state, _ = self.rnn(rnn_input, rnn_state)      # (1, B=32, hidden_size = 512)
         
         next_state = self.final_ln(next_state)
 

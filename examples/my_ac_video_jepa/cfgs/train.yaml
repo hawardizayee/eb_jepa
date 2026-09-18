@@ -1,6 +1,6 @@
 logging:
   log_wandb: true 
-  wandb_group:
+  wandb_group: baseline-ac-video
   wandb_sweep:
   log_every: 10
   exp_suffix: 26-09-19

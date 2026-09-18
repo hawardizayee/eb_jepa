@@ -3,7 +3,7 @@
 import torch.nn as nn 
 from einops import rearrange
 
-def init_module_weights(m, std: float = 0.2):
+def init_module_weights(m, std: float = 0.02):
     """
     Initializes weights for common layer types using truncated normal distribution.
 
