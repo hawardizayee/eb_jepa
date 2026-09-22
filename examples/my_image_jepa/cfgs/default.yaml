@@ -23,7 +23,7 @@ model:
 loss:
   type: vicreg    # vicreg or bcs 
   # VICReg loss weights
-  var_coeff: 0.5
+  var_coeff: 0.2
   cov_coeff: 100.0
   # BCS loss weight (only used if type=bcs)
   lmbd: 10.0 
