@@ -231,7 +231,7 @@ def run(
 
     # Initialize loss function
     if cfg.loss.type == "vicreg":
-        loss_fn = VICRegLoss(var_coeff=cfg.loss.var_coeff, cov_coeff=cfg.loss.cov_coeff)
+        loss_fn = VICRegLoss(std_coeff=cfg.loss.std_coeff, cov_coeff=cfg.loss.cov_coeff)
     elif cfg.loss.type == "bcs":
         loss_fn = BCS(lmbd=cfg.loss.lmbd)
 
