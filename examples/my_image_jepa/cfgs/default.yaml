@@ -2,7 +2,7 @@
 # Train a self-supervised image representation model on CIFAR-10 
 
 meta:
-  seed: 42
+  seed: 1
   device: auto # auto,cuda or cpu 
 
 data:
