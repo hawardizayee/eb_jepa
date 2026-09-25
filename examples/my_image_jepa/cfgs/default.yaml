@@ -2,7 +2,7 @@
 # Train a self-supervised image representation model on CIFAR-10 
 
 meta:
-  seed: 1000
+  seed: 42
   device: auto # auto,cuda or cpu 
 
 data:
@@ -23,7 +23,7 @@ model:
 loss:
   type: vicreg    # vicreg or bcs 
   # VICReg loss weights 
-  std_coeff: 0.01
+  var_coeff: 0.35
   cov_coeff: 100.0
   # BCS loss weight (only used if type=bcs)
   lmbd: 10.0 
@@ -58,6 +58,6 @@ sweep:
     model.use_projector: [true, false]
     model.proj_hidden_dim: [64, 128, 256, 512, 1024, 2048, 4096]
     model.proj_output_dim: [64, 128, 256, 512, 1024, 2048, 4096]
-    loss.std_coeff: [1.0, 10.0, 100.0]
+    loss.var_coeff: [1.0, 10.0, 100.0]
     loss.cov_coeff: [0.1, 1.0, 10.0, 100.0]
     meta.seed: [1, 1000, 10000]

@@ -314,7 +314,7 @@ def get_exp_name(example_name: str, cfg) -> str:
             parts.append(f"ph{cfg.model.proj_hidden_dim}")
             parts.append(f"po{cfg.model.proj_output_dim}")
         if cfg.loss.type == "vicreg":
-            parts.append(f"std{cfg.loss.std_coeff}")
+            parts.append(f"var{cfg.loss.var_coeff}")
             parts.append(f"cov{cfg.loss.cov_coeff}")
         elif cfg.loss.type == "bcs":
             parts.append(f"lmbd{cfg.loss.lmbd}")
